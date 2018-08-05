@@ -1,6 +1,7 @@
 import socket
 import ssl
 import re
+
 '''
 def protocol_of_url(url):
 
@@ -63,8 +64,13 @@ else:
     return 'http'
 '''
 
+
+def log(*args, **kwargs):
+    print("log", *args, **kwargs)
+
+
 def parsed_url(url):
-    #检查协议
+    # 检查协议
     protocol = 'http'
     if url[:7] == 'http://':
         u = url.split('://')[1]
@@ -74,7 +80,7 @@ def parsed_url(url):
     else:
         u = url
 
-    #检查默认 path
+    # 检查默认 path
     i = u.find('/')
     if i == -1:
         host = u
@@ -83,30 +89,32 @@ def parsed_url(url):
         host = u[:i]
         path = u[i:]
 
-    #检查端口
+    # 检查端口
     port_dict = {
         'http': 80,
         'https': 443,
     }
-    #默认端口
+    # 默认端口
     port = port_dict[protocol]
     if ':' in host:
         u = host.split(':')
         host = u[0]
         port = int(u[1])
-    return protocol,host,port,path
+    return protocol, host, port, path
+
 
 def socket_by_protocol(protocol):
-#根据协议返回一个socket实例
+    # 根据协议返回一个socket实例
     if protocol == 'http':
         s = socket.socket()
     else:
         s = ssl.wrap_socket(socket.socket())
     return s
 
+
 def response_by_socket(s):
-#参数是一个socket 实例
-#返回这个socket读取的所有数据
+    # 参数是一个socket 实例
+    # 返回这个socket读取的所有数据
     respons = b''
     buffer_size = 1024
     while True:
@@ -116,66 +124,72 @@ def response_by_socket(s):
         respons += r
     return respons
 
+
 def parsed_response(r):
-#把response解析出状态码headers body返回状态码是int
-#headers是dict
-#body是str
-    header, body = r.split('\r\n\r\n',1)
+    # 把response解析出状态码headers body返回状态码是int
+    # headers是dict
+    # body是str
+    header, body = r.split('\r\n\r\n', 1)
     h = header.split('\r\n')
     status_code = h[0].split()[1]
     statu_code = int(status_code)
 
     headers = {}
     for line in h[1:]:
-        k,v = line.split(': ')
+        # log(line)
+        k, v = line.split(': ')
         headers[k] = v
-    return status_code, headers, body
+    return statu_code, headers, body
+
 
 def get(url):
-    #用get请求url并返回响应
-    protocol,host,port,path = parsed_url(url)
+    # 用get请求url并返回响应
+    protocol, host, port, path = parsed_url(url)
     s = socket_by_protocol(protocol)
-    s.connect((host,port))
+    s.connect((host, port))
 
-    request = 'GET {} HTTP/1.1\r\nhost:{}\r\nConnection: close\r\n\r\n'.format(path,host)
+    request = 'GET {} HTTP/1.1\r\nhost:{}\r\nConnection: close\r\n\r\n'.format(path, host)
     s.send(request.encode('utf-8'))
     response = response_by_socket(s)
     r = response.decode('utf-8')
-
     status_code, headers, body = parsed_response(r)
-    if status_code in [301,302]:
+
+    # 获取重定向的新地址
+    if status_code in [301, 302]:
         url = headers['Location']
         return get(url)
-    return status_code, headers,body
+    return status_code, headers, body
 
 
-#test 单元测试
+# test 单元测试
 def test_parsed_url():
     http = 'http'
     https = 'https'
     host = 'g.cn'
     path = '/'
     test_items = {
-        ('http://g.cn',(http,host,80,path)),
-        ('http://g.cn/',(http,host,80,path)),
-        ('http://g.cn:90',(http,host,90,path)),
-        ('http://g.cn:90/',(http,host,90,path)),
-        ('https://g.cn',(https,host,443,path)),
-        ('https://g.cn:233/',(https,host,233,path)),
+        ('http://g.cn', (http, host, 80, path)),
+        ('http://g.cn/', (http, host, 80, path)),
+        ('http://g.cn:90', (http, host, 90, path)),
+        ('http://g.cn:90/', (http, host, 90, path)),
+        ('https://g.cn', (https, host, 443, path)),
+        ('https://g.cn:233/', (https, host, 233, path)),
     }
 
     for t in test_items:
         url = t[0]
         expected = t[1]
         u = parsed_url(url)
-        e = "parsed_url ERROR,({}) ({}) ({})".format(url,u,expected)
-        #TURE则断言成功，FALSE则输出e
-        assert u == expected,e
+        e = "parsed_url ERROR,({}) ({}) ({})".format(url, u, expected)
+        # TURE则断言成功，FALSE则输出e
+        assert u == expected, e
+
 
 def test():
-    #用于测试主函数
+    # 用于测试主函数
     test_parsed_url()
 
 
 if __name__ == '__main__':
-    print(get('https://zhihu.com'))
+    s, h, b = get('http://movie.douban.com/top250')
+    log(b)
